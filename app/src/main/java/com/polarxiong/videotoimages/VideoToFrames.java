@@ -154,20 +154,26 @@ public class VideoToFrames implements Runnable {
         int outputFrameCount = 0;
         while (!sawOutputEOS && !stopDecode) {
             if (!sawInputEOS) {
+                // 喂数据 操作 【压缩数据】
                 int inputBufferId = decoder.dequeueInputBuffer(DEFAULT_TIMEOUT_US);
                 if (inputBufferId >= 0) {
+                    // 获取到容器
                     ByteBuffer inputBuffer = decoder.getInputBuffer(inputBufferId);
+                    // 往容器中填充数据
                     int sampleSize = extractor.readSampleData(inputBuffer, 0);
                     if (sampleSize < 0) {
+                        // 结束解码
                         decoder.queueInputBuffer(inputBufferId, 0, 0, 0L, MediaCodec.BUFFER_FLAG_END_OF_STREAM);
                         sawInputEOS = true;
                     } else {
+                        // 送入解码器
                         long presentationTimeUs = extractor.getSampleTime();
                         decoder.queueInputBuffer(inputBufferId, 0, sampleSize, presentationTimeUs, 0);
                         extractor.advance();
                     }
                 }
             }
+            // 收数据
             int outputBufferId = decoder.dequeueOutputBuffer(info, DEFAULT_TIMEOUT_US);
             if (outputBufferId >= 0) {
                 if ((info.flags & MediaCodec.BUFFER_FLAG_END_OF_STREAM) != 0) {
@@ -179,6 +185,25 @@ public class VideoToFrames implements Runnable {
                     if (callback != null) {
                         callback.onDecodeFrame(outputFrameCount);
                     }
+
+                    if (false){
+                        ByteBuffer outputBuffer = decoder.getOutputBuffer(outputBufferId);
+                        if (outputBuffer != null) {
+                            outputBuffer.position(0);
+                            outputBuffer.limit(info.offset + info.size);
+                            byte[] yuvData = new byte[outputBuffer.remaining()];
+                            outputBuffer.get(yuvData);
+
+                            //FileUtils.writeBytes(yuvData, "codec-YUV.h264");
+
+                            //mediaCodec.configure(mediaformat, null, null, 0);
+                            decoder.releaseOutputBuffer(outputBufferId, false);
+                            outputBuffer.clear();
+                            Log.d(TAG, "onOutputBufferAvailable: yuvData ==>" + yuvData.length);
+                            return;
+                        }
+                    }
+
                     Image image = decoder.getOutputImage(outputBufferId);
                     //System.out.println("image format: " + image.getFormat());
 
